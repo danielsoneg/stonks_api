@@ -8,7 +8,12 @@ Description: >
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 60
+
+Parameters:
+  TradierApiToken:
+    Description: "Required. The Tradier API Token"
+    Type: "String"
 
 Resources:
   SPCompFunction:
@@ -17,12 +22,25 @@ Resources:
       CodeUri: spcomp/
       Handler: app.lambda_handler
       Runtime: python3.7
+      Environment:
+        Variables:
+          TRADIER_API_TOKEN: !Ref TradierApiToken
       Events:
         SPComp:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /spcomp
             Method: get
+            RestApiId: !Ref ApiGateway
+
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: StonksAPIGateway
+      Description: The API Gateway for the Stonks
+      StageName: Prod
+      TracingEnabled: true
+      BinaryMediaTypes: ["*/*"]
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
@@ -30,7 +48,7 @@ Outputs:
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   SPCompApi:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/spcomp/"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/spcomp/"
   SPCompFunction:
     Description: "Hello World Lambda Function ARN"
     Value: !GetAtt SPCompFunction.Arn
