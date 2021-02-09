@@ -26,16 +26,16 @@ class Tradier:
         try:
             resp = requests.get(url, params=params, headers=headers)
         except requests.RequestException as err:
-            raise TradierError("Error talking to Tradier")
+            raise self.TradierError("Error talking to Tradier")
         if resp.status_code >= 500:
-            raise BadResponse("Tradier returned a %d" % resp.status_code)
+            raise self.BadResponse("Tradier returned a %d" % resp.status_code)
         if resp.status_code >= 400:
-            raise BadRequest("Tradier returned a %d" % resp.status_code)
+            raise self.BadRequest("Tradier returned a %d" % resp.status_code)
 
         try:
             return resp.json()
         except JSONDecodeError as err:
-            raise BadResponse("Response was invalid json")
+            raise self.BadResponse("Response was invalid json")
 
     def get_for_days(self, symbol, days):
         params = {
@@ -48,4 +48,4 @@ class Tradier:
             body = self.make_call("markets/history", params)
             return body["history"]["day"]
         except IndexError:
-            raise BadResponse("Tradier did not return the expected data")
+            raise self.BadResponse("Tradier did not return the expected data")
