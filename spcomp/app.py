@@ -15,6 +15,7 @@ Log = logging.getLogger()
 Log.setLevel(logging.INFO)
 Log.info("Started!")
 
+# Short-circuit matplotlib's font cache generation, which takes ~10+sec
 shutil.copytree(os.curdir + "/matplotlib_cache", "/tmp/mpl_cache")
 os.environ["MPLCONFIGDIR"] = "/tmp/mpl_cache"
 matplotlib.use("agg")
@@ -23,12 +24,35 @@ tradier = Tradier(os.environ["TRADIER_API_TOKEN"])
 
 
 def get_returns(symbol, days):
+    """Return cumulative returns for the given symbol and days
+
+    Note that days are calendar days, not trading days, so '28 days'
+    will return around 20 data points. 
+
+    Params:
+        symbol: str: Stock symbol to get returns for
+        days: int: Number of days of returns to get
+    Returns:
+        list of cumulative percent returns
+    """
     data = tradier.get_for_days(symbol, days)
     pcts = stockmath.get_pcts(data)
     return stockmath.get_cumulative_return(pcts)
 
 
 def compare_sp(symbol, days=365):
+    """Compare a symbol against the S&P index.
+
+    Note that days are calendar days, not trading days, so '28 days'
+    will return around 20 data points. 
+
+    Params:
+        symbol: str: Stock symbol to compare to the S&P
+        days: int: Number of calendar days to run the comparison. Default: 365
+    Returns:
+        Tuple of the symbol's cumulative percent returns, the S&P's cumulative
+        percent returns, and the cumulative difference
+    """
     returns = get_returns(symbol, days)
     index = get_returns("VOO", days)
     if len(returns) < len(index):
@@ -38,6 +62,17 @@ def compare_sp(symbol, days=365):
 
 
 def plot_returns(symbol, returns, index, diffs):
+    """Generate a plot of the returns of a stock, the index, and the difference.
+
+    Params:
+        symbol: str: Name of the symbol being graphed
+        returns: List[float]: cumulative percent returns over time for the symbol
+        index: List[float]: cumulative percent returns over time for the index
+        diffs: List[float]: cumulative difference between the symbol and index
+
+    Returns:
+        Bytestring of the chart as a PNG
+    """
     Log.info("plot: starting")
     fig = Figure(figsize=(8, 6), dpi=100)
     plt = fig.add_subplot(111)
@@ -62,7 +97,7 @@ def plot_returns(symbol, returns, index, diffs):
 
 
 def lambda_handler(event, context):
-    """Sample pure Lambda function
+    """Lambda function
 
     Parameters
     ----------
@@ -86,6 +121,7 @@ def lambda_handler(event, context):
     Log.info("Lambda Handler Start")
 
     def fail(message, code=400):
+        """Generate a failure body with the given message"""
         return {"statusCode": code, "body": json.dumps({"message": message})}
 
     if (not event["queryStringParameters"] or
@@ -99,14 +135,19 @@ def lambda_handler(event, context):
     except (ValueError, AssertionError):
         return fail("'days' parameter must be a positive numeric value")
 
-    Log.info('Getting returns')
-    returns, index, diffs = compare_sp(symbol, days)
-    Log.info('Generating Plot')
-    plot = plot_returns(symbol, returns, index, diffs)
-    Log.info("returning")
-    return {
-        'headers': {"Content-Type": "image/png"},
-        'statusCode': 200,
-        'body': base64.b64encode(plot).decode("utf-8"),
-        'isBase64Encoded': True
-    }
+    try:
+        Log.info('Getting returns')
+        returns, index, diffs = compare_sp(symbol, days)
+        Log.info('Generating Plot')
+        plot = plot_returns(symbol, returns, index, diffs)
+        Log.info("returning")
+    except Exception as err:
+        """We've already validated inputs, anything else is our failure"""
+        return fail(str(err), code=500)
+    else:
+        return {
+            'headers': {"Content-Type": "image/png"},
+            'statusCode': 200,
+            'body': base64.b64encode(plot).decode("utf-8"),
+            'isBase64Encoded': True
+        }
