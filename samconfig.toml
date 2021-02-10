@@ -1,9 +1,0 @@
-version = 0.1
-[default]
-[default.deploy]
-[default.deploy.parameters]
-stack_name = "stonks-api"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-mr7s0m7y8ecq"
-s3_prefix = "stonks-api"
-region = "us-west-2"
-capabilities = "CAPABILITY_IAM"
